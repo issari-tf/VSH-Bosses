@@ -18,6 +18,10 @@
 #define GRAYMANN_RAGE_DURATION					8.0
 #define GRAYMANN_SUPERRAGE_DURATION_MULT		2.0
 
+// Passive rage generation settings
+#define GRAYMANN_PASSIVE_RAGE_INTERVAL		1.0		// How often to add rage (in seconds)
+#define GRAYMANN_PASSIVE_RAGE_AMOUNT		20		// How much rage damage to add per interval
+
 enum
 {
   GRAYMANN_QUEUE_CAN_SPAWN,
@@ -29,6 +33,7 @@ static int g_iGrayMannQueuedMinions[MAXPLAYERS + 1];
 static int g_iGrayMannQueueReason[MAXPLAYERS + 1];
 
 static Handle g_hGrayMannSpawnQueuedMinionTimer[MAXPLAYERS + 1];
+static Handle g_hGrayMannPassiveRageTimer[MAXPLAYERS + 1];
 
 static int g_iGrayMannMinionAFKTimeLeft[MAXPLAYERS + 1];
 static Handle g_hGrayMannMinionAFKTimer[MAXPLAYERS + 1];
@@ -168,6 +173,7 @@ public void GrayMann_GetBossInfo(SaxtonHaleBase boss, char[] sInfo, int length)
   StrCat(sInfo, length, "\nAbilities");
   StrCat(sInfo, length, "\n- Mini Jump");
   StrCat(sInfo, length, "\n- Killing people turns them into gold, and you siphon their power to heal yourself for 250 HP flat");
+  StrCat(sInfo, length, "\n- Gain rage passively over time");
   StrCat(sInfo, length, "\n ");
   StrCat(sInfo, length, "\nRage");
   StrCat(sInfo, length, "\n- Damage requirement: 3000");
@@ -220,6 +226,9 @@ public void GrayMann_OnSpawn(SaxtonHaleBase boss)
   150: turn to gold
   180: heal on kill
   */
+  
+  // Start passive rage generation timer
+  g_hGrayMannPassiveRageTimer[boss.iClient] = CreateTimer(GRAYMANN_PASSIVE_RAGE_INTERVAL, Timer_GrayMann_PassiveRage, GetClientUserId(boss.iClient), TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
 }
 
 public void GrayMann_OnThink(SaxtonHaleBase boss)
@@ -338,6 +347,40 @@ public void GrayMann_Precache(SaxtonHaleBase boss) //not sure if custom sounds h
 public void GrayMann_Destroy(SaxtonHaleBase boss)
 {
   g_hGrayMannSpawnQueuedMinionTimer[boss.iClient] = null;
+  g_hGrayMannPassiveRageTimer[boss.iClient] = null;
+}
+
+////////////////////////////////////////////////////////
+//
+// PASSIVE RAGE GENERATION
+//
+////////////////////////////////////////////////////////
+
+Action Timer_GrayMann_PassiveRage(Handle hTimer, int iUserID)
+{
+  int iClient = GetClientOfUserId(iUserID);
+  if (iClient == 0)
+    return Plugin_Stop;
+  
+  if (hTimer != g_hGrayMannPassiveRageTimer[iClient])
+    return Plugin_Stop;
+  
+  if (!IsPlayerAlive(iClient) || !SaxtonHale_IsValidBoss(iClient))
+    return Plugin_Stop;
+  
+  SaxtonHaleBase boss = SaxtonHaleBase(iClient);
+  
+  // Add passive rage damage
+  boss.iRageDamage += GRAYMANN_PASSIVE_RAGE_AMOUNT;
+  
+  // Check if we've reached max rage and trigger it if so
+  if (boss.iRageDamage >= boss.iMaxRageDamage)
+  {
+    boss.iRageDamage = boss.iMaxRageDamage;
+    // The player will need to manually activate rage by taunting
+  }
+  
+  return Plugin_Continue;
 }
 
 ////////////////////////////////////////////////////////

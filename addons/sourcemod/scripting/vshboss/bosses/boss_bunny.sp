@@ -1,6 +1,11 @@
 #define BUNNY_MODEL "models/player/new_saxton_hale/easter_demo/new_easter_demo_v3.mdl"
 #define BUNNY_EGG   "models/player/saxton_hale/w_easteregg.mdl"
 
+// Bunny hop settings
+#define BHOP_SPEED_MULTIPLIER 1.15
+#define BHOP_MAX_SPEED 520.0
+#define JUMP_POWER_MULTIPLIER 1.4
+
 /// Easter Bunny voicelines
 static char g_strBunnyRoundStart[][] = {
   "vo/demoman_gibberish03.mp3",
@@ -58,6 +63,10 @@ static char g_strBunnyBackStabbed[][] = {
   "vo/demoman_sf12_badmagic07.mp3",
   "vo/demoman_sf12_badmagic10.mp3"
 };
+
+// Track bunny hop state
+static float g_flLastJumpTime[MAXPLAYERS+1];
+static float g_flBunnyHopSpeed[MAXPLAYERS+1];
 
 // Unused
 /*
@@ -161,8 +170,6 @@ public Action Timer_SetEggBomb(Handle timer, any ref)
   return Plugin_Continue;
 }
 
-
-
 public void Bunny_Create(SaxtonHaleBase boss)
 {
   boss.CreateClass("BraveJump");
@@ -174,6 +181,10 @@ public void Bunny_Create(SaxtonHaleBase boss)
   boss.flHealthExponential = 1.05;
   boss.nClass = TFClass_DemoMan;
   boss.iMaxRageDamage = 2500;
+  
+  // Initialize bunny hop variables
+  g_flLastJumpTime[boss.iClient] = 0.0;
+  g_flBunnyHopSpeed[boss.iClient] = 0.0;
 }
 
 public void Bunny_GetBossName(SaxtonHaleBase boss, char[] sName, int length)
@@ -186,7 +197,8 @@ public void Bunny_GetBossInfo(SaxtonHaleBase boss, char[] sInfo, int length)
   StrCat(sInfo, length, "\nHealth: Medium");
   StrCat(sInfo, length, "\n ");
   StrCat(sInfo, length, "\nAbilities");
-  StrCat(sInfo, length, "\n- Brave Jump");
+  StrCat(sInfo, length, "\n- Brave Jump (Enhanced)");
+  StrCat(sInfo, length, "\n- Bunny Hop (hold jump for speed boost)");
   StrCat(sInfo, length, "\n- On Kill Spawns Crit Eggs");
   StrCat(sInfo, length, "\n ");
   StrCat(sInfo, length, "\nRage");
@@ -215,15 +227,21 @@ public void Bunny_OnSpawn(SaxtonHaleBase boss)
   int iWeapon;
   char attribs[128];
 
-  Format(attribs, sizeof(attribs), "68 ; 2.0 ; 252 ; 0.5 ; 2 ; 3.0 ; 326 ; 1.3 ; 275 ; 1");
+  // Enhanced jump height in weapon attributes
+  Format(attribs, sizeof(attribs), "68 ; 2.0 ; 252 ; 0.5 ; 2 ; 3.5 ; 326 ; 1.5 ; 275 ; 1");
   iWeapon = boss.CallFunction("CreateWeapon", 609, "tf_weapon_bottle", 100, TFQual_Collectors, attribs);
   if (iWeapon > MaxClients)
     SetEntPropEnt(iClient, Prop_Send, "m_hActiveWeapon", iWeapon);
+  
+  // Initialize bunny hop state
+  g_flLastJumpTime[iClient] = 0.0;
+  g_flBunnyHopSpeed[iClient] = 0.0;
+  
   /*
   The Scottish Handshake attributes:
-  2: damage bonus 
+  2: damage bonus (increased from 3.0 to 3.5)
   68: increase player capture value 
-  326: increased jump height 
+  326: increased jump height (increased from 1.3 to 1.5)
   275: cancel falling damage 
   */
 }
@@ -257,15 +275,74 @@ public void Bunny_GetSoundAbility(SaxtonHaleBase boss, char[] sSound, int length
     strcopy(sSound, length, g_strBunnyJump[GetRandomInt(0,sizeof(g_strBunnyJump)-1)]);
 }
 
-
 public void Bunny_OnThink(SaxtonHaleBase boss)
 {
+  int iClient = boss.iClient;
   
+  if (!IsPlayerAlive(iClient))
+    return;
+  
+  // Get player flags and velocity
+  int iFlags = GetEntityFlags(iClient);
+  float vecVelocity[3];
+  GetEntPropVector(iClient, Prop_Data, "m_vecVelocity", vecVelocity);
+  
+  // Check if player just landed
+  bool bOnGround = (iFlags & FL_ONGROUND) != 0;
+  
+  // Get buttons
+  int iButtons = GetClientButtons(iClient);
+  bool bJumpPressed = (iButtons & IN_JUMP) != 0;
+  
+  // Bunny hop mechanic
+  if (bOnGround && bJumpPressed)
+  {
+    float flCurrentTime = GetGameTime();
+    float flTimeSinceLastJump = flCurrentTime - g_flLastJumpTime[iClient];
+    
+    // If jumped within timing window (bunny hop)
+    if (flTimeSinceLastJump < 0.5 && flTimeSinceLastJump > 0.0)
+    {
+      // Calculate horizontal speed
+      float flSpeed = SquareRoot(vecVelocity[0] * vecVelocity[0] + vecVelocity[1] * vecVelocity[1]);
+      
+      // Increase speed up to max
+      if (flSpeed > 0.0 && flSpeed < BHOP_MAX_SPEED)
+      {
+        float flNewSpeed = flSpeed * BHOP_SPEED_MULTIPLIER;
+        if (flNewSpeed > BHOP_MAX_SPEED)
+          flNewSpeed = BHOP_MAX_SPEED;
+        
+        // Apply speed boost in movement direction
+        float flScale = flNewSpeed / flSpeed;
+        vecVelocity[0] *= flScale;
+        vecVelocity[1] *= flScale;
+        
+        // Enhanced jump
+        vecVelocity[2] = 400.0 * JUMP_POWER_MULTIPLIER;
+        
+        TeleportEntity(iClient, NULL_VECTOR, NULL_VECTOR, vecVelocity);
+        g_flBunnyHopSpeed[iClient] = flNewSpeed;
+      }
+      else if (flSpeed == 0.0)
+      {
+        // First jump, give initial boost
+        vecVelocity[2] = 400.0 * JUMP_POWER_MULTIPLIER;
+        TeleportEntity(iClient, NULL_VECTOR, NULL_VECTOR, vecVelocity);
+      }
+    }
+    
+    g_flLastJumpTime[iClient] = flCurrentTime;
+  }
 }
 
 public void Bunny_GetHudInfo(SaxtonHaleBase boss, char[] sMessage, int iLength, int iColor[4])
 {
-
+  // Show bunny hop speed if moving fast
+  if (g_flBunnyHopSpeed[boss.iClient] > 350.0)
+  {
+    Format(sMessage, iLength, "Bunny Hop Speed: %.0f", g_flBunnyHopSpeed[boss.iClient]);
+  }
 }
 
 public void Bunny_OnRage(SaxtonHaleBase boss)

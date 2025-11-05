@@ -204,6 +204,7 @@ public void Bunny_GetBossInfo(SaxtonHaleBase boss, char[] sInfo, int length)
   StrCat(sInfo, length, "\nRage");
   StrCat(sInfo, length, "\n- Damage requirement: 2500");
   StrCat(sInfo, length, "\n- Shoots Crit Eggs!");
+  StrCat(sInfo, length, "\n- Infinite Jumps (Hype) for 4 seconds");
   StrCat(sInfo, length, "\n- Scares players at close range for 5 seconds");
   StrCat(sInfo, length, "\n- 200%% Rage: longer range scare and extends duration to 7.5 seconds");
 }
@@ -227,9 +228,9 @@ public void Bunny_OnSpawn(SaxtonHaleBase boss)
   int iWeapon;
   char attribs[128];
 
-  // Enhanced jump height in weapon attributes
+  // Candy Cane with enhanced jump height
   Format(attribs, sizeof(attribs), "68 ; 2.0 ; 252 ; 0.5 ; 2 ; 3.5 ; 326 ; 1.5 ; 275 ; 1");
-  iWeapon = boss.CallFunction("CreateWeapon", 609, "tf_weapon_bottle", 100, TFQual_Collectors, attribs);
+  iWeapon = boss.CallFunction("CreateWeapon", 317, "tf_weapon_bat", 100, TFQual_Collectors, attribs);
   if (iWeapon > MaxClients)
     SetEntPropEnt(iClient, Prop_Send, "m_hActiveWeapon", iWeapon);
   
@@ -238,11 +239,12 @@ public void Bunny_OnSpawn(SaxtonHaleBase boss)
   g_flBunnyHopSpeed[iClient] = 0.0;
   
   /*
-  The Scottish Handshake attributes:
-  2: damage bonus (increased from 3.0 to 3.5)
+  The Candy Cane attributes:
+  2: damage bonus (3.5x)
   68: increase player capture value 
-  326: increased jump height (increased from 1.3 to 1.5)
+  326: increased jump height (1.5x)
   275: cancel falling damage 
+  252: damage force reduction
   */
 }
 
@@ -353,6 +355,9 @@ public void Bunny_OnRage(SaxtonHaleBase boss)
 
   TF2_AddCondition(iClient, view_as< TFCond >(42), 4.0); 
 
+  // Apply Minify spell effect (condition 72 - speed boost and infinite jumps)
+  TF2_AddCondition(iClient, view_as< TFCond >(72), 4.0);
+
   TF2_RemoveWeaponSlot(iClient, TFWeaponSlot_Primary);
   Format(attribs, sizeof(attribs), "2 ; 1.5 ; 6 ; 0.1 ; 411 ; 150.0 ; 413 ; 1.0 ; 37 ; 0.0 ; 280 ; 17 ; 477 ; 1.0 ; 467 ; 1.0 ; 181 ; 2.0 ; 252 ; 0.7");
   iWeapon = boss.CallFunction("CreateWeapon", 19, "tf_weapon_grenadelauncher", 100, TFQual_Collectors, attribs);
@@ -366,7 +371,7 @@ public void Bunny_OnRage(SaxtonHaleBase boss)
   TF2_AddCondition(iClient, TFCond_CritOnWin, 4.0); // Crits for 4 seconds
 
   /*
-  Grenade Launchere attributes:
+  Grenade Launcher attributes:
   2: damage bonus 
   6: fire rate bonus 
   411: projectile spread angle penalty

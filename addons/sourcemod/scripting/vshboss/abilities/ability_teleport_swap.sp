@@ -41,10 +41,6 @@ Action vortex_touch(int entity, int other)
 
     if (!SaxtonHale_IsValidBoss(other))
     {
-        TF2_AddCondition(other, TFCond_EyeaductUnderworld, 0.1);
-    }
-    else
-    {
         TF2_AddCondition(other, TFCond_SpeedBuffAlly, 5.0);
     }
 

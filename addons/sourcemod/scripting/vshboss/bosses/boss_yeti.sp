@@ -52,7 +52,7 @@ public void Yeti_Create(SaxtonHaleBase boss)
 
   boss.SetPropFloat("GroundPound", "JumpCooldown", 0.0);
 
-  boss.CreateClass("Lunge");
+  boss.CreateClass("Pounce");
 
   boss.iHealthPerPlayer = 650;
   boss.flHealthExponential = 1.05;

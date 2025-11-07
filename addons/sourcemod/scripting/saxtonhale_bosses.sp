@@ -172,6 +172,7 @@ int g_iSpritesGlow;
 #include "vshboss/abilities/ability_dash_jump.sp"
 #include "vshboss/abilities/ability_groundpound.sp"
 #include "vshboss/abilities/ability_lunge.sp"
+#include "vshboss/abilities/ability_pounce.sp"
 #include "vshboss/abilities/ability_rage_attributes.sp"
 #include "vshboss/abilities/ability_rage_bomb.sp"
 #include "vshboss/abilities/ability_rage_bomb_projectile.sp"
@@ -286,6 +287,7 @@ public void OnLibraryAdded(const char[] name)
     SaxtonHale_RegisterClass("BombProjectile",        VSHClassType_Ability);
     SaxtonHale_RegisterClass("BraveJump",             VSHClassType_Ability);
     SaxtonHale_RegisterClass("DashJump",              VSHClassType_Ability);
+    SaxtonHale_RegisterClass("Pounce",                VSHClassType_Ability);
     SaxtonHale_RegisterClass("GroundPound",           VSHClassType_Ability);
     SaxtonHale_RegisterClass("Lunge",                 VSHClassType_Ability);
     SaxtonHale_RegisterClass("RageAttributes",        VSHClassType_Ability);

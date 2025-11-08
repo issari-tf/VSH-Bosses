@@ -1,5 +1,6 @@
 #define PARTICLE_TELEPORT	"merasmus_tp"
 #define TELEPORT_RADIUS 600.0
+#define SOLID_BBOX 2
 
 enum TeleportViewMode
 {

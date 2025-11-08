@@ -184,6 +184,7 @@ int g_iSpritesGlow;
 #include "vshboss/abilities/ability_rage_scare.sp"
 #include "vshboss/abilities/ability_teleport_swap.sp"
 #include "vshboss/abilities/ability_teleport_view.sp"
+#include "vshboss/abilities/ability_hellfire.sp"
 #include "vshboss/abilities/ability_wallclimb.sp"
 #include "vshboss/abilities/ability_weapon_ball.sp"
 #include "vshboss/abilities/ability_weapon_charge.sp"
@@ -299,6 +300,7 @@ public void OnLibraryAdded(const char[] name)
     SaxtonHale_RegisterClass("ScareRage",             VSHClassType_Ability);
     SaxtonHale_RegisterClass("TeleportSwap",          VSHClassType_Ability);
     SaxtonHale_RegisterClass("TeleportView",          VSHClassType_Ability);
+    SaxtonHale_RegisterClass("Hellfire",              VSHClassType_Ability);
     SaxtonHale_RegisterClass("WallClimb",             VSHClassType_Ability);
     SaxtonHale_RegisterClass("WeaponBall",            VSHClassType_Ability);
     SaxtonHale_RegisterClass("WeaponCharge",          VSHClassType_Ability);

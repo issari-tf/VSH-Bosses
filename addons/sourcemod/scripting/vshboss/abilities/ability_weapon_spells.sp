@@ -175,7 +175,7 @@ public Action WeaponSpells_OnCommandKeyValues(SaxtonHaleBase boss, const char[] 
       
       //spell cooldowns, set timer after used
       g_flSpellsLastUsed[boss.iClient] = GetGameTime();
-      boss.CallFunction("UpdateHudInfo", 1.0, boss.GetPropFloat("WeaponSpells", "Cooldown"));	//Update every second for cooldown duration
+      boss.CallFunction("UpdateHudInfo", 0.0, 0.0);	//FIXED: Update once instead of every second
       
       
       //Play ability sound if boss have one
@@ -276,4 +276,3 @@ void Client_ForceUseAction(int iClient)
   FakeClientCommandKeyValues(iClient, kv);
   delete kv;
 }
-

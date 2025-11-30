@@ -184,6 +184,7 @@ int g_iSpritesGlow;
 #include "vshboss/abilities/ability_rage_scare.sp"
 #include "vshboss/abilities/ability_teleport_swap.sp"
 #include "vshboss/abilities/ability_teleport_view.sp"
+#include "vshboss/abilities/ability_slither.sp"
 #include "vshboss/abilities/ability_hellfire.sp"
 #include "vshboss/abilities/ability_wallclimb.sp"
 #include "vshboss/abilities/ability_weapon_ball.sp"
@@ -203,6 +204,7 @@ int g_iSpritesGlow;
 #include "vshboss/bosses/boss_hale.sp"
 #include "vshboss/bosses/boss_horsemann.sp"
 #include "vshboss/bosses/boss_painiscupcakes.sp"
+#include "vshboss/bosses/boss_pisscakehole.sp"
 #include "vshboss/bosses/boss_redmond.sp"
 #include "vshboss/bosses/boss_seeldier.sp"
 #include "vshboss/bosses/boss_seeman.sp"
@@ -230,8 +232,22 @@ public void OnPluginStart()
 {
   // OnLibraryAdded dont always call TF2Items on plugin start
   //g_bTF2Items = LibraryExists("TF2Items");
+  // Hook OnButtonPress to debug
+  SaxtonHale_HookFunction("OnButtonPress", OnButtonPress_Hook, VSHHookMode_Pre);
 
   SDK_Init();
+}
+
+public Action OnButtonPress_Hook(SaxtonHaleBase boss)
+{
+    // Only debug if this boss has Slither
+    if (!boss.HasClass("Slither"))
+        return Plugin_Continue;
+    
+    int iButton = SaxtonHale_GetParam(1);
+    PrintToServer("[Slither Hook] OnButtonPress called for Slither boss - Button: %d (IN_RELOAD = %d)", iButton, IN_RELOAD);
+    
+    return Plugin_Continue;
 }
 
 public void OnMapStart()
@@ -262,6 +278,7 @@ public void OnLibraryAdded(const char[] name)
     SaxtonHale_RegisterClass("Horsemann",             VSHClassType_Boss);
     SaxtonHale_RegisterClass("Merasmus",              VSHClassType_Boss);
     SaxtonHale_RegisterClass("PainisCupcake",         VSHClassType_Boss);
+    SaxtonHale_RegisterClass("PissCakehole",          VSHClassType_Boss);
     SaxtonHale_RegisterClass("Redmond",               VSHClassType_Boss);
     SaxtonHale_RegisterClass("Seeldier",              VSHClassType_Boss);
     SaxtonHale_RegisterClass("SeeMan",                VSHClassType_Boss);
@@ -298,6 +315,7 @@ public void OnLibraryAdded(const char[] name)
     SaxtonHale_RegisterClass("LightRage",             VSHClassType_Ability);
     SaxtonHale_RegisterClass("RageMeteor",            VSHClassType_Ability);
     SaxtonHale_RegisterClass("ScareRage",             VSHClassType_Ability);
+    SaxtonHale_RegisterClass("Slither",               VSHClassType_Ability);
     SaxtonHale_RegisterClass("TeleportSwap",          VSHClassType_Ability);
     SaxtonHale_RegisterClass("TeleportView",          VSHClassType_Ability);
     SaxtonHale_RegisterClass("Hellfire",              VSHClassType_Ability);

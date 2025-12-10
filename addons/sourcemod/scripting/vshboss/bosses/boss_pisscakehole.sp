@@ -45,6 +45,7 @@ static char g_strPissCakeholeHit[][] = {
 public void PissCakehole_Create(SaxtonHaleBase boss)
 {
   boss.CreateClass("Slither");
+  boss.CreateClass("PissLunge"); // Add PissLunge ability
 
   boss.CreateClass("RageAddCond");
   boss.SetPropFloat("RageAddCond", "RageCondDuration", 10.0);
@@ -103,6 +104,19 @@ public void PissCakehole_GetSoundAbility(SaxtonHaleBase boss, char[] sSound, int
 
   if (strcmp(sType, "Slither") == 0)
     strcopy(sSound, length, g_strPissCakeholeSlither[GetRandomInt(0,sizeof(g_strPissCakeholeSlither)-1)]);
+  
+  if (strcmp(sType, "SlitherLoop") == 0)
+    strcopy(sSound, length, "freak_fortress_2/piss_cakehole/piss_slither_loop.mp3");
+  
+  // PissLunge ability sounds
+  if (strcmp(sType, "PissLungeStart") == 0)
+    strcopy(sSound, length, g_strPissCakeholeJump[GetRandomInt(0,sizeof(g_strPissCakeholeJump)-1)]);
+  
+  if (strcmp(sType, "PissLungeMiss") == 0)
+    strcopy(sSound, length, g_strPissCakeholeKillSpree[GetRandomInt(0,sizeof(g_strPissCakeholeKillSpree)-1)]);
+  
+  if (strcmp(sType, "PissLungeCarve") == 0)
+    strcopy(sSound, length, g_strPissCakeholeHit[GetRandomInt(0,sizeof(g_strPissCakeholeHit)-1)]);
 }
 
 public void PissCakehole_GetMusicInfo(SaxtonHaleBase boss, char[] sSound, int length, float &time)
@@ -127,7 +141,11 @@ public void PissCakehole_Precache(SaxtonHaleBase boss)
   for (int i = 0; i < sizeof(g_strPissCakeholeLastMan); i++) PrecacheSound(g_strPissCakeholeLastMan[i]);
   for (int i = 0; i < sizeof(g_strPissCakeholeHit); i++) PrecacheSound(g_strPissCakeholeHit[i]);
   for (int i = 0; i < sizeof(g_strPissCakeholeSlither); i++) PrepareSound(g_strPissCakeholeSlither[i]);
-
+  PrecacheSound("freak_fortress_2/piss_cakehole/piss_slither_loop.mp3");
+  
+  // Precache blood decal
+  PrecacheDecal("Blood");
+  
   AddFileToDownloadsTable("materials/models/piscke2/sniper/sniper_blue_invun.vmt");
   AddFileToDownloadsTable("materials/models/piscke2/sniper/sniper_blue_invun.vtf");
   AddFileToDownloadsTable("materials/models/piscke2/sniper/sniper_head_blue.vmt");
@@ -159,4 +177,5 @@ public void PissCakehole_Precache(SaxtonHaleBase boss)
   AddFileToDownloadsTable("sound/freak_fortress_2/piss_cakehole/piss_rage.mp3");
   AddFileToDownloadsTable("sound/freak_fortress_2/piss_cakehole/piss_hitv2.mp3");
   AddFileToDownloadsTable("sound/freak_fortress_2/piss_cakehole/piss_slither.mp3");
+  AddFileToDownloadsTable("sound/freak_fortress_2/piss_cakehole/piss_slither_loop.mp3");
 }

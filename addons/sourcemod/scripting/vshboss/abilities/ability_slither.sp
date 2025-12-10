@@ -1,4 +1,4 @@
-// Slither.sp - Toggleable slither ability for VSH/FF2
+// Slither.sp - Fast slither ability with damage interrupt for VSH/FF2
 
 static bool g_bSlithering[MAXPLAYERS + 1];
 static float g_flSlitherCooldown[MAXPLAYERS + 1];
@@ -6,6 +6,7 @@ static int g_iSlitherDamageTaken[MAXPLAYERS + 1];
 static float g_flOldSpeed[MAXPLAYERS + 1];
 static bool g_bSlitherButtonHeld[MAXPLAYERS + 1];
 static float g_flNextAnimReplay[MAXPLAYERS + 1];
+static int g_iSlitherSoundRef[MAXPLAYERS + 1] = {INVALID_ENT_REFERENCE, ...};
 
 public void Slither_Create(SaxtonHaleBase boss)
 {
@@ -15,11 +16,12 @@ public void Slither_Create(SaxtonHaleBase boss)
 	g_flOldSpeed[boss.iClient] = 0.0;
 	g_bSlitherButtonHeld[boss.iClient] = false;
 	g_flNextAnimReplay[boss.iClient] = 0.0;
+	g_iSlitherSoundRef[boss.iClient] = INVALID_ENT_REFERENCE;
 	
 	// Default values - can be changed per boss
 	boss.SetPropFloat("Slither", "Cooldown", 10.0);
 	boss.SetPropFloat("Slither", "Speed", 520.0);
-	boss.SetPropInt("Slither", "DamageThreshold", 50);
+	boss.SetPropInt("Slither", "DamageThreshold", 25);
 }
 
 public void Slither_Destroy(SaxtonHaleBase boss)
@@ -100,8 +102,9 @@ void Slither_Start(SaxtonHaleBase boss)
 	// Store old boss speed
 	g_flOldSpeed[iClient] = boss.flSpeed;
 	
-	// Use the VSH framework's speed property
-	boss.flSpeed = 520.0;
+	// Use much faster speed
+	float flSpeed = boss.GetPropFloat("Slither", "Speed");
+	boss.flSpeed = flSpeed;
 	
 	// Force third person
 	SetVariantInt(1);
@@ -123,11 +126,18 @@ void Slither_Start(SaxtonHaleBase boss)
 		char sSound[PLATFORM_MAX_PATH];
 		boss.CallFunction("GetSoundAbility", sSound, sizeof(sSound), "Slither");
 		if (!StrEmpty(sSound))
+		{
+			// Play initial sound
 			EmitSoundToAll(sSound, iClient, SNDCHAN_VOICE, SNDLEVEL_SCREAMING);
+			g_iSlitherSoundRef[iClient] = EntIndexToEntRef(iClient);
+		}
 	}
 	
 	// Start the think timer
 	CreateTimer(0.1, Timer_SlitherThink, GetClientUserId(iClient), TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
+	
+	// Start loop sound after a delay and keep repeating it
+	CreateTimer(1.0, Timer_LoopSoundRepeater, GetClientUserId(iClient), TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
 	
 	boss.CallFunction("UpdateHudInfo", 0.0, 0.1);
 }
@@ -137,6 +147,26 @@ void Slither_Stop(SaxtonHaleBase boss, bool bDamaged)
 	int iClient = boss.iClient;
 	
 	g_bSlithering[iClient] = false;
+	
+	// Stop all slither sounds
+	if (g_iSlitherSoundRef[iClient] != INVALID_ENT_REFERENCE)
+	{
+		int iSoundEnt = EntRefToEntIndex(g_iSlitherSoundRef[iClient]);
+		if (iSoundEnt > 0 && IsValidEntity(iSoundEnt))
+		{
+			char sSound[PLATFORM_MAX_PATH];
+			boss.CallFunction("GetSoundAbility", sSound, sizeof(sSound), "Slither");
+			if (!StrEmpty(sSound))
+				StopSound(iSoundEnt, SNDCHAN_VOICE, sSound);
+			
+			// Stop loop sound
+			char sLoopSound[PLATFORM_MAX_PATH];
+			boss.CallFunction("GetSoundAbility", sLoopSound, sizeof(sLoopSound), "SlitherLoop");
+			if (!StrEmpty(sLoopSound))
+				StopSound(iSoundEnt, SNDCHAN_AUTO, sLoopSound);
+		}
+		g_iSlitherSoundRef[iClient] = INVALID_ENT_REFERENCE;
+	}
 	
 	// Restore boss speed
 	if (g_flOldSpeed[iClient] > 0.0)
@@ -155,8 +185,9 @@ void Slither_Stop(SaxtonHaleBase boss, bool bDamaged)
 	// Only apply cooldown if stopped by damage
 	if (bDamaged)
 	{
-		g_flSlitherCooldown[iClient] = GetGameTime() + 10.0;
-		boss.CallFunction("UpdateHudInfo", 1.0, 10.0); // Update every second for 10 seconds
+		float flCooldown = boss.GetPropFloat("Slither", "Cooldown");
+		g_flSlitherCooldown[iClient] = GetGameTime() + flCooldown;
+		boss.CallFunction("UpdateHudInfo", 1.0, flCooldown);
 	}
 	else
 	{
@@ -183,11 +214,12 @@ public Action Timer_SlitherThink(Handle hTimer, int iUserId)
 		g_flNextAnimReplay[iClient] = GetGameTime() + 0.6;
 	}
 	
-	// Keep boss speed at 520
-	if (boss.flSpeed != 520.0)
-		boss.flSpeed = 520.0;
+	// Keep boss speed at configured value
+	float flSpeed = boss.GetPropFloat("Slither", "Speed");
+	if (boss.flSpeed != flSpeed)
+		boss.flSpeed = flSpeed;
 	
-	// Surface crawling movement
+	// Wall climbing movement
 	Slither_HandleMovement(iClient);
 	
 	return Plugin_Continue;
@@ -258,6 +290,48 @@ void Slither_HandleMovement(int iClient)
 public bool Slither_TraceFilter(int iEntity, int iContentsMask, int iClient)
 {
 	return iEntity != iClient;
+}
+
+public Action Timer_StartLoopSound(Handle hTimer, int iUserId)
+{
+	int iClient = GetClientOfUserId(iUserId);
+	if (iClient <= 0 || !IsClientInGame(iClient) || !IsPlayerAlive(iClient) || !g_bSlithering[iClient])
+		return Plugin_Stop;
+	
+	SaxtonHaleBase boss = SaxtonHaleBase(iClient);
+	
+	// Get the loop sound from boss
+	char sLoopSound[PLATFORM_MAX_PATH];
+	boss.CallFunction("GetSoundAbility", sLoopSound, sizeof(sLoopSound), "SlitherLoop");
+	
+	if (!StrEmpty(sLoopSound))
+	{
+		// Play the looping sound
+		EmitSoundToAll(sLoopSound, iClient, SNDCHAN_AUTO, SNDLEVEL_SCREAMING);
+	}
+	
+	return Plugin_Continue;
+}
+
+public Action Timer_LoopSoundRepeater(Handle hTimer, int iUserId)
+{
+	int iClient = GetClientOfUserId(iUserId);
+	if (iClient <= 0 || !IsClientInGame(iClient) || !IsPlayerAlive(iClient) || !g_bSlithering[iClient])
+		return Plugin_Stop;
+	
+	SaxtonHaleBase boss = SaxtonHaleBase(iClient);
+	
+	// Get the loop sound from boss
+	char sLoopSound[PLATFORM_MAX_PATH];
+	boss.CallFunction("GetSoundAbility", sLoopSound, sizeof(sLoopSound), "SlitherLoop");
+	
+	if (!StrEmpty(sLoopSound))
+	{
+		// Keep playing the loop sound every few seconds
+		EmitSoundToAll(sLoopSound, iClient, SNDCHAN_AUTO, SNDLEVEL_SCREAMING);
+	}
+	
+	return Plugin_Continue;
 }
 
 public void Slither_OnTakeDamage(SaxtonHaleBase boss, int &iAttacker, int &iInflictor, float &flDamage, int &iDamageType, int &iWeapon, float vecDamageForce[3], float vecDamagePosition[3], int iDamageCustom)

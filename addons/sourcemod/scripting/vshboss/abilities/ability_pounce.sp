@@ -1,14 +1,10 @@
 #pragma semicolon 1
 #pragma newdecls required
 
-// Warrior's Spirit Pounce - Boss Ability Version
-// Converted from standalone plugin to SaxtonHale boss ability
-
-#define WARRIORS_SPIRIT 310
 #define POUNCE_FORCE 900.0
 #define POUNCE_DAMAGE 10.0
-#define IMPACT_SOUND "player/taunt_yeti_land.wav"
-#define IMPACT_PARTICLE "hammer_impact_button"
+#define POUNCE_IMPACT_SOUND "player/taunt_yeti_land.wav"
+#define POUNCE_IMPACT_PARTICLE "hammer_impact_button"
 
 static float g_flPounceCooldownWait[MAXPLAYERS];
 static bool g_bPounceActive[MAXPLAYERS];

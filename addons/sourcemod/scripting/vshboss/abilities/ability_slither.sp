@@ -7,6 +7,7 @@ static float g_flOldSpeed[MAXPLAYERS + 1];
 static bool g_bSlitherButtonHeld[MAXPLAYERS + 1];
 static float g_flNextAnimReplay[MAXPLAYERS + 1];
 static int g_iSlitherSoundRef[MAXPLAYERS + 1] = {INVALID_ENT_REFERENCE, ...};
+static bool g_bSlitherEnabled[MAXPLAYERS + 1];
 
 public void Slither_Create(SaxtonHaleBase boss)
 {
@@ -17,6 +18,7 @@ public void Slither_Create(SaxtonHaleBase boss)
 	g_bSlitherButtonHeld[boss.iClient] = false;
 	g_flNextAnimReplay[boss.iClient] = 0.0;
 	g_iSlitherSoundRef[boss.iClient] = INVALID_ENT_REFERENCE;
+	g_bSlitherEnabled[boss.iClient] = true; // Start enabled by default
 	
 	// Default values - can be changed per boss
 	boss.SetPropFloat("Slither", "Cooldown", 10.0);
@@ -32,6 +34,10 @@ public void Slither_Destroy(SaxtonHaleBase boss)
 
 public void Slither_GetHudInfo(SaxtonHaleBase boss, char[] sMessage, int iLength, int iColor[4])
 {
+	// Don't show in HUD if disabled
+	if (!g_bSlitherEnabled[boss.iClient])
+		return;
+	
 	if (g_bSlithering[boss.iClient])
 	{
 		Format(sMessage, iLength, "%s\nSlither: ACTIVE [R]", sMessage);
@@ -49,6 +55,10 @@ public void Slither_GetHudInfo(SaxtonHaleBase boss, char[] sMessage, int iLength
 
 public void Slither_OnButton(SaxtonHaleBase boss, int &buttons)
 {
+	// Don't work if disabled
+	if (!g_bSlitherEnabled[boss.iClient])
+		return;
+	
 	// Block attacks and other abilities while slithering
 	if (g_bSlithering[boss.iClient])
 	{
@@ -65,6 +75,10 @@ public void Slither_OnButton(SaxtonHaleBase boss, int &buttons)
 public void Slither_OnButtonRelease(SaxtonHaleBase boss, int button)
 {
 	if (button != IN_RELOAD)
+		return;
+	
+	// Don't work if disabled
+	if (!g_bSlitherEnabled[boss.iClient])
 		return;
 	
 	g_bSlitherButtonHeld[boss.iClient] = false;
@@ -95,6 +109,10 @@ void Slither_Start(SaxtonHaleBase boss)
 	int iClient = boss.iClient;
 	
 	if (!IsClientInGame(iClient) || !IsPlayerAlive(iClient))
+		return;
+	
+	// Don't start if disabled
+	if (!g_bSlitherEnabled[iClient])
 		return;
 	
 	g_bSlithering[iClient] = true;
@@ -137,7 +155,7 @@ void Slither_Start(SaxtonHaleBase boss)
 	CreateTimer(0.1, Timer_SlitherThink, GetClientUserId(iClient), TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
 	
 	// Start loop sound after a delay and keep repeating it
-	CreateTimer(1.0, Timer_LoopSoundRepeater, GetClientUserId(iClient), TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
+	CreateTimer(1.5, Timer_LoopSoundRepeater, GetClientUserId(iClient), TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
 	
 	boss.CallFunction("UpdateHudInfo", 0.0, 0.1);
 }
@@ -347,4 +365,22 @@ public void Slither_OnTakeDamage(SaxtonHaleBase boss, int &iAttacker, int &iInfl
 		PrintToChatAll("%N's Slither interrupted by %d damage!", boss.iClient, RoundToFloor(flDamage));
 		Slither_Stop(boss, true);
 	}
+}
+
+// Function to disable Slither (called when rage is activated)
+public void Slither_Disable(SaxtonHaleBase boss)
+{
+	// Stop slither if currently active
+	if (g_bSlithering[boss.iClient])
+		Slither_Stop(boss, false);
+	
+	g_bSlitherEnabled[boss.iClient] = false;
+	boss.CallFunction("UpdateHudInfo", 0.0, 0.1);
+}
+
+// Function to enable Slither
+public void Slither_Enable(SaxtonHaleBase boss)
+{
+	g_bSlitherEnabled[boss.iClient] = true;
+	boss.CallFunction("UpdateHudInfo", 0.0, 0.1);
 }

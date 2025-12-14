@@ -85,6 +85,50 @@ public void PissCakehole_OnSpawn(SaxtonHaleBase boss)
   SetEntProp(boss.iClient, Prop_Send, "m_bUseClassAnimations", 1);
 }
 
+public void PissCakehole_OnRage(SaxtonHaleBase boss)
+{
+  // During rage, disable Slither and enable PissLunge
+  if (boss.HasClass("Slither"))
+  {
+    Slither_Disable(boss);
+  }
+  
+  // Enable PissLunge
+  if (boss.HasClass("PissLunge"))
+  {
+    PissLunge_Enable(boss);
+  }
+  
+  // Force HUD update
+  boss.CallFunction("UpdateHudInfo", 0.0, 0.1);
+}
+
+public void PissCakehole_OnThink(SaxtonHaleBase boss)
+{
+  // Check if rage just ended
+  static bool bWasInRage[MAXPLAYERS + 1];
+  
+  bool bInRage = TF2_IsPlayerInCondition(boss.iClient, TFCond_UberchargedCanteen);
+  
+  // If we were in rage but now we're not, restore Slither and disable PissLunge
+  if (bWasInRage[boss.iClient] && !bInRage)
+  {
+    if (boss.HasClass("Slither"))
+    {
+      Slither_Enable(boss);
+    }
+    
+    if (boss.HasClass("PissLunge"))
+    {
+      PissLunge_Disable(boss);
+    }
+    
+    boss.CallFunction("UpdateHudInfo", 0.0, 0.1);
+  }
+  
+  bWasInRage[boss.iClient] = bInRage;
+}
+
 public void PissCakehole_GetSound(SaxtonHaleBase boss, char[] sSound, int length, SaxtonHaleSound iSoundType)
 {
   switch (iSoundType)
@@ -159,12 +203,12 @@ public void PissCakehole_Precache(SaxtonHaleBase boss)
   AddFileToDownloadsTable("materials/models/piscke2/sniper/invulnerability_blue.vmt");
   AddFileToDownloadsTable("materials/models/piscke2/sniper/invulnerability_blue.vtf");
   
-  AddFileToDownloadsTable("models/freak_fortress_2/piss_cakehole/realpisscakehole.dx80.vtx");
-  AddFileToDownloadsTable("models/freak_fortress_2/piss_cakehole/realpisscakehole.dx90.vtx");
-  AddFileToDownloadsTable("models/freak_fortress_2/piss_cakehole/realpisscakehole.mdl");
-  AddFileToDownloadsTable("models/freak_fortress_2/piss_cakehole/realpisscakehole.phy");
-  AddFileToDownloadsTable("models/freak_fortress_2/piss_cakehole/realpisscakehole.vvd");
-  AddFileToDownloadsTable("models/freak_fortress_2/piss_cakehole/realpisscakehole.sw.vtx");
+  AddFileToDownloadsTable("models/freak_fortress_2/piss_cakehole_issari/realpisscakehole.dx80.vtx");
+  AddFileToDownloadsTable("models/freak_fortress_2/piss_cakehole_issari/realpisscakehole.dx90.vtx");
+  AddFileToDownloadsTable("models/freak_fortress_2/piss_cakehole_issari/realpisscakehole.mdl");
+  AddFileToDownloadsTable("models/freak_fortress_2/piss_cakehole_issari/realpisscakehole.phy");
+  AddFileToDownloadsTable("models/freak_fortress_2/piss_cakehole_issari/realpisscakehole.vvd");
+  AddFileToDownloadsTable("models/freak_fortress_2/piss_cakehole_issari/realpisscakehole.sw.vtx");
   
   AddFileToDownloadsTable("sound/freak_fortress_2/piss_cakehole/iampisscakehole.wav");
   AddFileToDownloadsTable("sound/freak_fortress_2/piss_cakehole/piss_intro.mp3");
@@ -173,6 +217,8 @@ public void PissCakehole_Precache(SaxtonHaleBase boss)
   AddFileToDownloadsTable("sound/freak_fortress_2/piss_cakehole/piss_die1.wav");
   AddFileToDownloadsTable("sound/freak_fortress_2/piss_cakehole/piss_die2.wav");
   AddFileToDownloadsTable("sound/freak_fortress_2/piss_cakehole/pissbgm.mp3");
+  AddFileToDownloadsTable("sound/freak_fortress_2/piss_cakehole/pissragebgm.mp3");
+  AddFileToDownloadsTable("sound/freak_fortress_2/piss_cakehole/pexplosion.mp3");
   AddFileToDownloadsTable("sound/freak_fortress_2/piss_cakehole/piss_jump1.wav");
   AddFileToDownloadsTable("sound/freak_fortress_2/piss_cakehole/piss_rage.mp3");
   AddFileToDownloadsTable("sound/freak_fortress_2/piss_cakehole/piss_hitv2.mp3");

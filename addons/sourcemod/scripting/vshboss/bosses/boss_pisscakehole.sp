@@ -1,5 +1,6 @@
-#define PISSCAKEHOLE_MODEL "models/freak_fortress_2/piss_cakehole/realpisscakehole.mdl"
+#define PISSCAKEHOLE_MODEL "models/freak_fortress_2/piss_cakehole_issari/realpisscakehole.mdl"
 #define PISSCAKEHOLE_BGM "freak_fortress_2/piss_cakehole/pissbgm.mp3"
+#define PISSCAKEHOLE_RAGE_BGM "freak_fortress_2/piss_cakehole/pissragebgm.mp3"
 
 static char g_strPissCakeholeRoundStart[][] = {
   "freak_fortress_2/piss_cakehole/piss_intro.mp3"
@@ -42,16 +43,27 @@ static char g_strPissCakeholeHit[][] = {
   "freak_fortress_2/piss_cakehole/piss_hitv2.mp3"
 };
 
+static char g_strPissCakeholeExplosion[][] = {
+  "freak_fortress_2/piss_cakehole/pexplosion.mp3"
+};
+
+static int g_iRageWeapon[MAXPLAYERS + 1] = {INVALID_ENT_REFERENCE, ...};
+
 public void PissCakehole_Create(SaxtonHaleBase boss)
 {
   boss.CreateClass("Slither");
-  boss.CreateClass("PissLunge"); // Add PissLunge ability
-
+  boss.CreateClass("PissLunge");
+  boss.CreateClass("Shockwave"); // Shockwave ability during rage
+  
   boss.CreateClass("RageAddCond");
-  boss.SetPropFloat("RageAddCond", "RageCondDuration", 10.0);
+  boss.SetPropFloat("RageAddCond", "RageCondDuration", 15.0);
   RageAddCond_AddCond(boss, TFCond_UberchargedCanteen);
   
-  boss.iHealthPerPlayer = 500;
+  boss.CreateClass("RageAttributes");
+  boss.SetPropFloat("RageAttributes", "RageAttribDuration", 999999.0); // Permanent
+  RageAttributes_AddAttrib(boss, 107, 1.3, 1.3, false); // 1.3x move speed
+  
+  boss.iHealthPerPlayer = 600;
   boss.flHealthExponential = 1.05;
   boss.nClass = TFClass_Sniper;
   boss.iMaxRageDamage = 2500;
@@ -64,7 +76,18 @@ public void PissCakehole_GetBossName(SaxtonHaleBase boss, char[] sName, int leng
 
 public void PissCakehole_GetBossInfo(SaxtonHaleBase boss, char[] sInfo, int length)
 {
-  StrCat(sInfo, length, "");
+  StrCat(sInfo, length, "\nHealth: Medium");
+  StrCat(sInfo, length, "\n ");
+  StrCat(sInfo, length, "\nAbilities");
+  StrCat(sInfo, length, "\n- Slither: Fast movement that can climb walls");
+  StrCat(sInfo, length, "\n  Interrupted if taking 25+ damage in one hit");
+  StrCat(sInfo, length, "\n ");
+  StrCat(sInfo, length, "\nRage");
+  StrCat(sInfo, length, "\n- Damage requirement: 2500");
+  StrCat(sInfo, length, "\n- Übercharge, 1.3x speed, and Half-Zatoichi for 10 seconds");
+  StrCat(sInfo, length, "\n- Slither replaced with Piss Lunge (instant kill aerial attack)");
+  StrCat(sInfo, length, "\n- Shockwave: knockback + 10 damage (3 uses, 8s cooldown)");
+  StrCat(sInfo, length, "\n- 200%% Rage: extends duration to 30 seconds");
 }
 
 public void PissCakehole_GetModel(SaxtonHaleBase boss, char[] sModel, int length)
@@ -75,7 +98,8 @@ public void PissCakehole_GetModel(SaxtonHaleBase boss, char[] sModel, int length
 public void PissCakehole_OnSpawn(SaxtonHaleBase boss)
 {
   char attribs[128];
-  Format(attribs, sizeof(attribs), "2 ; 3.0 ; 252 ; 0.5 ; 68 ; 2.0");
+  // 100 damage, 0.5 knockback resistance, 2x capture rate, 5 seconds bleed on hit
+  Format(attribs, sizeof(attribs), "2 ; 1.54 ; 252 ; 0.5 ; 68 ; 2.0 ; 149 ; 5.0");
   int iWeapon = boss.CallFunction("CreateWeapon", 8, "tf_weapon_bonesaw", 100, TFQual_Strange, attribs);
   if (iWeapon > MaxClients)
     SetEntPropEnt(boss.iClient, Prop_Send, "m_hActiveWeapon", iWeapon);
@@ -83,50 +107,130 @@ public void PissCakehole_OnSpawn(SaxtonHaleBase boss)
   SetVariantString(PISSCAKEHOLE_MODEL);
   AcceptEntityInput(boss.iClient, "SetCustomModel");
   SetEntProp(boss.iClient, Prop_Send, "m_bUseClassAnimations", 1);
+  
+  g_iRageWeapon[boss.iClient] = INVALID_ENT_REFERENCE;
 }
 
 public void PissCakehole_OnRage(SaxtonHaleBase boss)
 {
-  // During rage, disable Slither and enable PissLunge
-  if (boss.HasClass("Slither"))
-  {
-    Slither_Disable(boss);
-  }
+  // Play rage animation
+  SDKCall_PlaySpecificSequence(boss.iClient, "rage");
   
-  // Enable PissLunge
-  if (boss.HasClass("PissLunge"))
-  {
-    PissLunge_Enable(boss);
-  }
+  // Freeze during animation (4 seconds)
+  SetEntityMoveType(boss.iClient, MOVETYPE_NONE);
+  TF2_AddCondition(boss.iClient, TFCond_FreezeInput, 4.0);
   
-  // Force HUD update
-  boss.CallFunction("UpdateHudInfo", 0.0, 0.1);
+  // Force third person during animation
+  SetVariantInt(1);
+  AcceptEntityInput(boss.iClient, "SetForcedTauntCam");
+  
+  // After animation, give weapon and swap abilities
+  CreateTimer(4.0, Timer_RageAnimationEnd, GetClientUserId(boss.iClient));
+  
+  // Schedule rage end to restore abilities
+  float flDuration = boss.GetPropFloat("RageAddCond", "RageCondDuration");
+  if (boss.bSuperRage)
+    flDuration *= boss.GetPropFloat("RageAddCond", "RageCondSuperRageMultiplier");
+  
+  CreateTimer(flDuration, Timer_RageEnd, GetClientUserId(boss.iClient));
 }
 
-public void PissCakehole_OnThink(SaxtonHaleBase boss)
+public Action Timer_RageAnimationEnd(Handle hTimer, int iUserId)
 {
-  // Check if rage just ended
-  static bool bWasInRage[MAXPLAYERS + 1];
+  int iClient = GetClientOfUserId(iUserId);
+  if (iClient <= 0 || !IsClientInGame(iClient) || !IsPlayerAlive(iClient))
+    return Plugin_Stop;
   
-  bool bInRage = TF2_IsPlayerInCondition(boss.iClient, TFCond_UberchargedCanteen);
+  SaxtonHaleBase boss = SaxtonHaleBase(iClient);
   
-  // If we were in rage but now we're not, restore Slither and disable PissLunge
-  if (bWasInRage[boss.iClient] && !bInRage)
+  // Unfreeze
+  SetEntityMoveType(iClient, MOVETYPE_WALK);
+  TF2_RemoveCondition(iClient, TFCond_FreezeInput);
+  
+  // Return to first person
+  SetVariantInt(0);
+  AcceptEntityInput(iClient, "SetForcedTauntCam");
+  
+  // Swap abilities
+  if (boss.HasClass("Slither"))
+    Slither_Disable(boss);
+  
+  if (boss.HasClass("PissLunge"))
+    PissLunge_Enable(boss);
+  
+  // Remove old weapon
+  int iOldWeapon = GetPlayerWeaponSlot(iClient, TFWeaponSlot_Melee);
+  if (iOldWeapon > MaxClients && IsValidEntity(iOldWeapon))
   {
-    if (boss.HasClass("Slither"))
-    {
-      Slither_Enable(boss);
-    }
-    
-    if (boss.HasClass("PissLunge"))
-    {
-      PissLunge_Disable(boss);
-    }
-    
-    boss.CallFunction("UpdateHudInfo", 0.0, 0.1);
+    RemovePlayerItem(iClient, iOldWeapon);
+    RemoveEntity(iOldWeapon);
   }
   
-  bWasInRage[boss.iClient] = bInRage;
+  // Create Half-Zatoichi: 200 damage (3.08x), 2x attack speed (0.5)
+  char attribs[256];
+  Format(attribs, sizeof(attribs), "2 ; 3.08 ; 6 ; 0.5");
+  
+  int iWeapon = boss.CallFunction("CreateWeapon", 357, "tf_weapon_katana", 100, TFQual_Strange, attribs);
+  if (iWeapon > MaxClients)
+  {
+    SetEntPropEnt(iClient, Prop_Send, "m_hActiveWeapon", iWeapon);
+    g_iRageWeapon[iClient] = EntIndexToEntRef(iWeapon);
+    FakeClientCommand(iClient, "slot3");
+  }
+  
+  // Apply green glow
+  SetEntityRenderMode(iClient, RENDER_TRANSCOLOR);
+  SetEntityRenderColor(iClient, 0, 255, 0, 255);
+  
+  // Activate Shockwave ability
+  if (boss.HasClass("Shockwave"))
+    Shockwave_Activate(boss);
+  
+  return Plugin_Stop;
+}
+
+public Action Timer_RageEnd(Handle hTimer, int iUserId)
+{
+  int iClient = GetClientOfUserId(iUserId);
+  if (iClient <= 0 || !IsClientInGame(iClient) || !IsPlayerAlive(iClient))
+    return Plugin_Stop;
+  
+  SaxtonHaleBase boss = SaxtonHaleBase(iClient);
+  
+  // Restore abilities
+  if (boss.HasClass("PissLunge"))
+    PissLunge_Disable(boss);
+  
+  if (boss.HasClass("Slither"))
+    Slither_Enable(boss);
+  
+  // Deactivate Shockwave
+  if (boss.HasClass("Shockwave"))
+    Shockwave_Deactivate(boss);
+  
+  // Remove rage weapon and restore bonesaw
+  int iOldWeapon = GetPlayerWeaponSlot(iClient, TFWeaponSlot_Melee);
+  if (iOldWeapon > MaxClients && IsValidEntity(iOldWeapon))
+  {
+    RemovePlayerItem(iClient, iOldWeapon);
+    RemoveEntity(iOldWeapon);
+  }
+  
+  // Recreate bonesaw
+  char attribs[128];
+  Format(attribs, sizeof(attribs), "2 ; 1.54 ; 252 ; 0.5 ; 68 ; 2.0 ; 149 ; 5.0");
+  int iWeapon = boss.CallFunction("CreateWeapon", 8, "tf_weapon_bonesaw", 100, TFQual_Strange, attribs);
+  if (iWeapon > MaxClients)
+  {
+    SetEntPropEnt(iClient, Prop_Send, "m_hActiveWeapon", iWeapon);
+    FakeClientCommand(iClient, "slot3");
+  }
+  
+  // Remove green glow
+  SetEntityRenderMode(iClient, RENDER_NORMAL);
+  SetEntityRenderColor(iClient, 255, 255, 255, 255);
+  
+  return Plugin_Stop;
 }
 
 public void PissCakehole_GetSound(SaxtonHaleBase boss, char[] sSound, int length, SaxtonHaleSound iSoundType)
@@ -152,7 +256,6 @@ public void PissCakehole_GetSoundAbility(SaxtonHaleBase boss, char[] sSound, int
   if (strcmp(sType, "SlitherLoop") == 0)
     strcopy(sSound, length, "freak_fortress_2/piss_cakehole/piss_slither_loop.mp3");
   
-  // PissLunge ability sounds
   if (strcmp(sType, "PissLungeStart") == 0)
     strcopy(sSound, length, g_strPissCakeholeJump[GetRandomInt(0,sizeof(g_strPissCakeholeJump)-1)]);
   
@@ -161,6 +264,9 @@ public void PissCakehole_GetSoundAbility(SaxtonHaleBase boss, char[] sSound, int
   
   if (strcmp(sType, "PissLungeCarve") == 0)
     strcopy(sSound, length, g_strPissCakeholeHit[GetRandomInt(0,sizeof(g_strPissCakeholeHit)-1)]);
+  
+  if (strcmp(sType, "Shockwave") == 0)
+    strcopy(sSound, length, g_strPissCakeholeExplosion[GetRandomInt(0,sizeof(g_strPissCakeholeExplosion)-1)]);
 }
 
 public void PissCakehole_GetMusicInfo(SaxtonHaleBase boss, char[] sSound, int length, float &time)
@@ -169,11 +275,23 @@ public void PissCakehole_GetMusicInfo(SaxtonHaleBase boss, char[] sSound, int le
   time = 136.0;
 }
 
+public void PissCakehole_GetRageMusicInfo(SaxtonHaleBase boss, char[] sSound, int length, float &time)
+{
+  strcopy(sSound, length, PISSCAKEHOLE_RAGE_BGM);
+  
+  // Match rage duration
+  float flDuration = boss.GetPropFloat("RageAddCond", "RageCondDuration");
+  if (boss.bSuperRage)
+    flDuration *= boss.GetPropFloat("RageAddCond", "RageCondSuperRageMultiplier");
+  
+  time = flDuration;
+}
+
 public void PissCakehole_Precache(SaxtonHaleBase boss)
 {
   PrepareModel(PISSCAKEHOLE_MODEL);
   
-  PrepareMusic(PISSCAKEHOLE_BGM);
+  PrepareSound(PISSCAKEHOLE_RAGE_BGM);
   
   for (int i = 0; i < sizeof(g_strPissCakeholeRoundStart); i++) PrecacheSound(g_strPissCakeholeRoundStart[i]);
   for (int i = 0; i < sizeof(g_strPissCakeholeWin); i++) PrecacheSound(g_strPissCakeholeWin[i]);
@@ -184,10 +302,10 @@ public void PissCakehole_Precache(SaxtonHaleBase boss)
   for (int i = 0; i < sizeof(g_strPissCakeholeCatchPhrase); i++) PrecacheSound(g_strPissCakeholeCatchPhrase[i]);
   for (int i = 0; i < sizeof(g_strPissCakeholeLastMan); i++) PrecacheSound(g_strPissCakeholeLastMan[i]);
   for (int i = 0; i < sizeof(g_strPissCakeholeHit); i++) PrecacheSound(g_strPissCakeholeHit[i]);
+  for (int i = 0; i < sizeof(g_strPissCakeholeExplosion); i++) PrecacheSound(g_strPissCakeholeExplosion[i]);
   for (int i = 0; i < sizeof(g_strPissCakeholeSlither); i++) PrepareSound(g_strPissCakeholeSlither[i]);
   PrecacheSound("freak_fortress_2/piss_cakehole/piss_slither_loop.mp3");
   
-  // Precache blood decal
   PrecacheDecal("Blood");
   
   AddFileToDownloadsTable("materials/models/piscke2/sniper/sniper_blue_invun.vmt");

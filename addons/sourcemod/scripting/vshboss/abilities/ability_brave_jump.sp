@@ -8,8 +8,8 @@ public void BraveJump_Create(SaxtonHaleBase boss)
   boss.SetPropInt("BraveJump", "JumpChargeBuild", 4);
   boss.SetPropFloat("BraveJump", "MaxHeight", 1100.0);
   boss.SetPropFloat("BraveJump", "MaxDistance", 0.45);
-  boss.SetPropFloat("BraveJump", "Cooldown", 7.0);
-  boss.SetPropFloat("BraveJump", "MinCooldown", 5.5);
+  boss.SetPropFloat("BraveJump", "Cooldown", 5.0);
+  boss.SetPropFloat("BraveJump", "MinCooldown", 5.0);
   boss.SetPropFloat("BraveJump", "CooldownWait", 0.0);
   boss.SetPropFloat("BraveJump", "EyeAngleRequirement", -25.0);	//How far up should the boss look for the ability to trigger? Minimum value is -89.0 (all the way up)
 }
